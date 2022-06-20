@@ -1,6 +1,6 @@
 import heapq
 import logging
-from .base_proxy import BasePerturbationProxy
+from base_proxy import BasePerturbationProxy
 
 
 class BaseCounterfactualSearch:

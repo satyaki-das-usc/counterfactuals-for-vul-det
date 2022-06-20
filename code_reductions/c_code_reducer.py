@@ -6,8 +6,8 @@ from typing import cast
 from omegaconf import OmegaConf, DictConfig
 sys.path.append("..")
 
-from counterfactuals.explainer import SequenceExplainer
-from counterfactuals.counterfactual_search import GreedySearch
+from explainer import SequenceExplainer
+from counterfactual_search import GreedySearch
 from code_reductions.reducer_proxies import CCodePerturbationProxy
 
 CONF_PATH = "configs/dwk.yaml"

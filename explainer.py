@@ -1,7 +1,7 @@
 import time
 from typing import List
-from .counterfactual_search import BaseCounterfactualSearch, GreedySearch
-from .base_proxy import BasePerturbationProxy
+from counterfactual_search import BaseCounterfactualSearch, GreedySearch
+from base_proxy import BasePerturbationProxy
 
 class SequenceExplainer:
     def __init__(self, counterfactual_search: BaseCounterfactualSearch=None):

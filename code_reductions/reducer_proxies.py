@@ -1,7 +1,7 @@
 import sys
 sys.path.append("..")
 
-from counterfactuals.base_proxy import BasePerturbationProxy
+from base_proxy import BasePerturbationProxy
 from typing import List, Tuple
 
 class RedundantCodeClassifier:
