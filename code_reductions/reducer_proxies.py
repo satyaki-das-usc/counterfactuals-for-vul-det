@@ -72,11 +72,13 @@ class DeepWukongClassifier:
             if pred == 1:
                 vul_cnt += 1
         
-        output = int(vul_cnt > 0)
+        output = vul_cnt > 0
         
         # os.system(f"pushd {model_folder_path}")
         # os.system(f"cat env.sh")
-        
+
+        if pred_cnt < 1:
+            return (0, 0)
 
         return (output, vul_cnt / pred_cnt)
 
