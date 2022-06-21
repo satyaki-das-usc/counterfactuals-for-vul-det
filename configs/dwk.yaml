@@ -24,6 +24,7 @@ log_every_epoch: 10
 progress_bar_refresh_rate: 1
 
 model_data_folder: "/home/satyaki/luka/DeepWukongCopy/data"
+model_dataset_name: "CWE119-counterfactuals"
 
 dataset:
   cve_id: CWE119

@@ -8,7 +8,7 @@ sys.path.append("..")
 
 from explainer import SequenceExplainer
 from counterfactual_search import GreedySearch
-from code_reductions.reducer_proxies import CCodePerturbationProxy
+from code_reductions.reducer_proxies import DeepWukongPerturbationProxy
 
 CONF_PATH = "configs/dwk.yaml"
 
@@ -25,7 +25,8 @@ def main():
         with open(src_file_path, "r") as f:
             code_str = f.read()
 
-        proxy = CCodePerturbationProxy()
+        proxy = DeepWukongPerturbationProxy()
+        proxy.set_testcase(filename)
         explainer = SequenceExplainer(GreedySearch(proxy))
         preturbations = explainer.explain(code_str).perturbation_tracking
         print(len(preturbations))

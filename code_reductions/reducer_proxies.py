@@ -1,51 +1,92 @@
+import os
+import json
+from typing import cast
+from omegaconf import OmegaConf, DictConfig
 import sys
 sys.path.append("..")
 
 from base_proxy import BasePerturbationProxy
 from typing import List, Tuple
 
-class RedundantCodeClassifier:
+CONF_PATH = "configs/dwk.yaml"
 
-    OFFENSIVE_WORD_SCORE_INCREASE:float = 0.15
-    FORBIDDEN_WORD_SCORE_INCREASE:float = 0.2
+class DeepWukongClassifier:
 
     def __init__(
         self,
-        offensive_words: List[str],
-        forbidden_words: List[str]
+        testcase: str
     ):
-        self.forbidden_words = forbidden_words
-        self.offensive_words = offensive_words
+        self.testcase = testcase
 
-    def predict(self, sentence: str) -> Tuple[int, float]:
-        sequence = sentence.split(' ')
-        forbidden_word_count = 0
-        offensive_word_count = 0
-        for token in sequence:
-            if token in self.forbidden_words:
-                forbidden_word_count += 1
-                continue
-            if token in self.offensive_words:
-                offensive_word_count += 1
+    def prep_DeepWukong(self, code_str: str):
+        config = cast(DictConfig, OmegaConf.load(CONF_PATH))
+        self.CWE_PATH = os.path.join(config.data_folder, config.dataset.cve_id)
+        self.MODEL_DATA_FOLDER = config.model_data_folder
+        self.MODEL_DATASET_NAME = config.model_dataset_name
+        self.MODEL_CVE_DATA_FOLDER = os.path.join(self.MODEL_DATA_FOLDER, self.MODEL_DATASET_NAME)
+        CSV_PATH = os.path.join(self.MODEL_CVE_DATA_FOLDER, "csv")
+        XFG_PATH = os.path.join(self.MODEL_CVE_DATA_FOLDER, "XFG")
+        SOURCE_CODE_PATH = os.path.join(self.MODEL_CVE_DATA_FOLDER, "source-code")
 
-        # if a forbidden word is used, score is at least 0.5
-        # and goes up in increments from there from there
-        score = 0.0
-        if forbidden_word_count > 0:
-            score += 0.5 + ((forbidden_word_count-1)*self.FORBIDDEN_WORD_SCORE_INCREASE)
+        folders = [CSV_PATH, XFG_PATH]
 
-        # Add 0.15 score for each offensive word
-        score += offensive_word_count*self.OFFENSIVE_WORD_SCORE_INCREASE
-        label = 1 if score >= 0.5 else 0
+        for foldername in folders:
+            if os.path.isdir(foldername):
+                command = f"rm -rf {foldername}"
+                os.system(command)
+        
+        filename = os.path.join(SOURCE_CODE_PATH, self.testcase)
+        if not os.path.isfile(filename):
+            os.system(f"touch {filename}")
 
-        return (label, min(score, 1.0))
+        with open(filename, "w") as f:
+            f.write(code_str)
+    
+    def predict(self, code_str: str) -> Tuple[int, float]:
+        self.prep_DeepWukong(code_str)
 
-class CCodePerturbationProxy(BasePerturbationProxy):
+        model_folder_path = self.MODEL_DATA_FOLDER.replace("data", "")[:-1]
+        cwd = os.getcwd()
+        os.chdir(model_folder_path)
+        
+        os.system(f"PYTHONPATH=\".\" python src/joern/joern-parse.py")
+        os.system(f"PYTHONPATH=\".\" python src/data_generator.py")
+        os.system(f"PYTHONPATH=\".\" python src/preprocess/dataset_generator.py")
+        os.system(f"PYTHONPATH=\".\" python src/evaluate.py --vul-files {self.testcase} {self.testcase} --dataset-name {self.MODEL_DATASET_NAME} DeepWukong")
+        
+        src_selected_results_path = os.path.join(model_folder_path, "select_results.json")
+        dst_selected_results_path = os.path.join(self.CWE_PATH, "select_results.json")
+
+        os.chdir(cwd)
+
+        os.system(f"cp {src_selected_results_path} {dst_selected_results_path}")
+
+        results = {}
+
+        with open(dst_selected_results_path, "r") as f:
+            results = json.load(f)
+        
+        pred_cnt = len(results[self.testcase])
+        vul_cnt = 0
+        for slice, pred in results[self.testcase]:
+            if pred == 1:
+                vul_cnt += 1
+        
+        output = int(vul_cnt > 0)
+        
+        # os.system(f"pushd {model_folder_path}")
+        # os.system(f"cat env.sh")
+        
+
+        return (output, vul_cnt / pred_cnt)
+
+class DeepWukongPerturbationProxy(BasePerturbationProxy):
+    
+    def set_testcase(self, testcase):
+        self.testcase = testcase
+
     def classify(self, document) -> Tuple[bool, float]:
-        code_classifier = RedundantCodeClassifier(
-            # primitive datatypes are offensive
-            offensive_words=["int", "char'" "float", "double'" "unsigned"],
-            # keywords are forbidden
-            forbidden_words=["break", "continue", "for", "if", "else", "while", "do"]
+        code_classifier = DeepWukongClassifier(
+            testcase=self.testcase
         )
         return code_classifier.predict(document)
